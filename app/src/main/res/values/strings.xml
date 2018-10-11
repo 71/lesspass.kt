@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">LessPass</string>
+
+    <string name="website">Website</string>
+    <string name="username">Username</string>
+    <string name="master">Master password</string>
+
+    <string name="preview_format">%s - LEN %d - CNT %d - ITR %,.0f - %s</string>
+
+    <string name="length">Length</string>
+    <string name="counter">Counter</string>
+    <string name="iterations">Iterations</string>
+    <string name="charsets">Character sets</string>
+    <string name="lowercase">Lowercase letters</string>
+    <string name="uppercase">Uppercase letters</string>
+    <string name="numbers">Numbers</string>
+    <string name="symbols">Symbols</string>
+    <string name="algorithm">Algorithm</string>
+
+    <string name="autofill">Autofill</string>
+    <string name="autofill_on">Autofill is enabled</string>
+    <string name="autofill_off">Autofill is disabled</string>
+
+    <string name="more_settings">More settings</string>
+</resources>

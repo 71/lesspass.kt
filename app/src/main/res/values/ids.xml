@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="main_password_view" type="id" />
+
+    <item name="main_sha256_button" type="id" />
+    <item name="main_sha384_button" type="id" />
+    <item name="main_sha512_button" type="id" />
+</resources>
