@@ -1,12 +1,18 @@
 package gregoiregeis.lesspass
 
+import android.text.style.ForegroundColorSpan
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.PBEParametersGenerator
-import org.bouncycastle.crypto.PasswordConverter
-import org.bouncycastle.crypto.digests.*
+import org.bouncycastle.crypto.digests.SHA256Digest
+import org.bouncycastle.crypto.digests.SHA384Digest
+import org.bouncycastle.crypto.digests.SHA512Digest
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator
 import org.bouncycastle.crypto.params.KeyParameter
+import org.jetbrains.anko.append
+import org.jetbrains.anko.buildSpanned
 import java.math.BigInteger
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 private val byteToHex = (
         "000102030405060708090A0B0C0D0E0F" +
@@ -27,7 +33,7 @@ private val byteToHex = (
         "F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF").toCharArray()
 
 // See: https://stackoverflow.com/a/21429909
-private inline fun ByteArray.toHexString(): String {
+private fun ByteArray.toHexString(): String {
     val len = size
     val chars = CharArray(len shl 1)
     var hexIndex: Int
@@ -43,7 +49,7 @@ private inline fun ByteArray.toHexString(): String {
     return String(chars)
 }
 
-private inline fun BigInteger.divRem(div: BigInteger): Pair<BigInteger, Int> {
+private fun BigInteger.divRem(div: BigInteger): Pair<BigInteger, Int> {
     val res = this.divideAndRemainder(div)
 
     return Pair(res[0], res[1].toInt())
@@ -57,7 +63,7 @@ fun generateEntropy(password: String, salt: String, settings: Settings): String 
     }
 
     // Key generation
-    val saltBuffer = PasswordConverter.UTF8.convert(salt.toCharArray())
+    val saltBuffer = salt.toByteArray(Charsets.UTF_8)
 
     val generator = PKCS5S2ParametersGenerator(digest).apply {
         init(PBEParametersGenerator.PKCS5PasswordToUTF8Bytes(password.toCharArray()), saltBuffer, settings.iterations)
@@ -109,4 +115,102 @@ fun renderPassword(settings: Settings, entropy: String): String {
     }
 
     return password
+}
+
+
+// Fingerprint, see https://github.com/lesspass/lesspass/blob/master/master-password/src/index.js
+
+fun generateFingerprintHash(password: String): ByteArray {
+    val key = password.toByteArray(Charsets.UTF_8)
+    val hasher = Mac.getInstance("HmacSHA256").apply {
+        init(SecretKeySpec(key, "HmacSHA256"))
+    }
+
+    return hasher.doFinal(ByteArray(0))
+}
+
+private val fingerprintColors = arrayOf(
+        0xFF000000.toInt(),
+        0xFF074750.toInt(),
+        0xFF009191.toInt(),
+        0xFFFF6CB6.toInt(),
+        0xFFFFB5DA.toInt(),
+        0xFF490092.toInt(),
+        0xFF006CDB.toInt(),
+        0xFFB66DFF.toInt(),
+        0xFF6DB5FE.toInt(),
+        0xFFB5DAFE.toInt(),
+        0xFF920000.toInt(),
+        0xFF924900.toInt(),
+        0xFFDB6D00.toInt(),
+        0xFF24FE23.toInt()
+)
+
+private val fingerprintIcons = arrayOf(
+        "\uf292",
+        "\uf004",
+        "\uf594",
+        "\uf19c",
+        "\uf1e6",
+        "\uf0f9",
+        "\uf207",
+        "\uf1b9",
+        "\uf072",
+        "\uf135",
+        "\uf21a",
+        "\uf239",
+        "\uf0d1",
+        "\uf157",
+        "\uf153",
+        "\uf15a",
+        "\uf155",
+        "\uf154",
+        "\uf187",
+        "\uf1fe",
+        "\uf236",
+        "\uf0fc",
+        "\uf0f3",
+        "\uf1e5",
+        "\uf1fd",
+        "\uf1e2",
+        "\uf0b1",
+        "\uf188",
+        "\uf030",
+        "\uf217",
+        "\uf0a3",
+        "\uf0f4",
+        "\uf0c2",
+        "\uf0f4", // Repeated?
+        "\uf075",
+        "\uf1b2",
+        "\uf2e7",
+        "\uf1c0",
+        "\uf219",
+        "\uf06a",
+        "\uf06e",
+        "\uf024",
+        "\uf0c3",
+        "\uf1e3",
+        "\uf11b",
+        "\uf19d"
+)
+
+private fun ByteArray.getInt3(i: Int) =
+        (0xff and this[i + 0].toInt() shl 16) or
+        (0xff and this[i + 1].toInt() shl 8) or
+        (0xff and this[i + 2].toInt())
+
+fun getFingerprintSpan(fingerprint: ByteArray) = buildSpanned {
+    val hash1 = fingerprint.getInt3(0)
+    val hash2 = fingerprint.getInt3(3)
+    val hash3 = fingerprint.getInt3(6)
+
+    append(fingerprintIcons[hash1 % fingerprintIcons.size],
+           ForegroundColorSpan(fingerprintColors[hash1 % fingerprintColors.size]))
+
+    append(fingerprintIcons[hash2 % fingerprintIcons.size],
+           ForegroundColorSpan(fingerprintColors[hash2 % fingerprintColors.size]))
+
+    append(fingerprintIcons[hash3 % fingerprintIcons.size],
+           ForegroundColorSpan(fingerprintColors[hash3 % fingerprintColors.size]))
 }

@@ -1,14 +1,13 @@
 package gregoiregeis.lesspass
 
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.AnimatedVectorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.support.design.widget.BottomSheetBehavior
-import android.support.design.widget.CoordinatorLayout
 import android.support.design.widget.FloatingActionButton
 import android.support.v7.app.AppCompatActivity
 import android.text.Editable
@@ -24,11 +23,10 @@ import kotlinx.coroutines.experimental.*
 import org.jetbrains.anko.*
 import org.jetbrains.anko.design.coordinatorLayout
 import org.jetbrains.anko.design.floatingActionButton
-import org.jetbrains.anko.design.snackbar
 import org.jetbrains.anko.design.textInputLayout
 import org.jetbrains.anko.sdk25.coroutines.onCheckedChange
 
-inline fun EditText.onTextChanged(crossinline cb: (CharSequence) -> Unit) {
+private inline fun EditText.onTextChanged(crossinline cb: (CharSequence) -> Unit) {
     this.addTextChangedListener(object : TextWatcher {
         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
         override fun afterTextChanged(s: Editable?) {}
@@ -39,7 +37,7 @@ inline fun EditText.onTextChanged(crossinline cb: (CharSequence) -> Unit) {
     })
 }
 
-inline fun SeekBar.onSeekBarChange(crossinline cb: (Int) -> Unit) {
+private inline fun SeekBar.onSeekBarChange(crossinline cb: (Int) -> Unit) {
     this.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
         override fun onStartTrackingTouch(seekBar: SeekBar?) {}
         override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -50,10 +48,29 @@ inline fun SeekBar.onSeekBarChange(crossinline cb: (Int) -> Unit) {
     })
 }
 
+private fun getTextSize(len: Int) = when {
+    len <= 16 -> 30f
+    len <= 22 -> 27f
+    len <= 27 -> 24f
+    len <= 32 -> 20f
+    len <= 40 -> 16f
+    len <= 48 -> 14f
+    len <= 56 -> 12f
+    else      -> 10f
+}
+
 class MainActivity : AppCompatActivity() {
     lateinit var settings: Settings
     lateinit var bottomSheetBehavior: BottomSheetBehavior<View>
 
+    var website        = ""
+    var username       = ""
+    var masterPassword = ""
+    var generatedPass  = ""
+
+    var darkMode = false
+
+    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -64,12 +81,9 @@ class MainActivity : AppCompatActivity() {
 
             var generatedPasswordView: TextView? = null
             var fab: FloatingActionButton? = null
+            var fingerprintView: TextView? = null
 
             var generateJob: Job? = null
-
-            var website        = ""
-            var username       = ""
-            var masterPassword = ""
 
             fun triggerUpdate() {
                 fab!!.hide()
@@ -80,30 +94,30 @@ class MainActivity : AppCompatActivity() {
                     generateJob?.apply { if (isActive) cancel() }
 
                     generateJob = GlobalScope.launch(Dispatchers.Default) {
-                        val generatedPassword = settings.generatePassword(masterPassword, website, username)
+                        generatedPass = settings.generatePassword(masterPassword, website, username)
 
                         GlobalScope.launch(Dispatchers.Main) {
-                            generatedPasswordView!!.text = generatedPassword
+                            generatedPasswordView!!.text = generatedPass
 
                             if (bottomSheetBehavior.state == BottomSheetBehavior.STATE_COLLAPSED)
                                 fab!!.show()
 
                             // Adapt text size in order not to be too large
-                            val len = generatedPassword.length
-
-                            generatedPasswordView!!.textSize = when {
-                                len <= 16 -> 30f
-                                len <= 22 -> 27f
-                                len <= 27 -> 24f
-                                len <= 32 -> 20f
-                                len <= 40 -> 16f
-                                len <= 48 -> 14f
-                                len <= 56 -> 12f
-                                else -> 10f
-                            }
+                            generatedPasswordView!!.textSize = getTextSize(generatedPass.length)
                         }
                     }
                 }
+            }
+
+            savedInstanceState?.apply {
+                website        = getString("website", "")
+                username       = getString("username", "")
+                masterPassword = getString("master", "")
+                generatedPass  = getString("generatedPassword", "")
+
+                darkMode = getBoolean("darkMode", false)
+
+                triggerUpdate()
             }
 
 
@@ -116,6 +130,11 @@ class MainActivity : AppCompatActivity() {
 
                     generatedPasswordView = textView {
                         textColor = Color.WHITE
+
+                        if (generatedPass.isNotBlank()) {
+                            text = generatedPass
+                            textSize = getTextSize(generatedPass.length)
+                        }
 
                         gravity = Gravity.CENTER_HORIZONTAL
                         textAlignment = TextView.TEXT_ALIGNMENT_CENTER
@@ -139,6 +158,8 @@ class MainActivity : AppCompatActivity() {
                             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
                             typeface = Typeface.MONOSPACE
 
+                            setText(website)
+
                             onTextChanged {
                                 website = it.toString()
                                 triggerUpdate()
@@ -152,6 +173,8 @@ class MainActivity : AppCompatActivity() {
 
                             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
                             typeface = Typeface.MONOSPACE
+
+                            setText(username)
 
                             onTextChanged {
                                 username = it.toString()
@@ -169,11 +192,39 @@ class MainActivity : AppCompatActivity() {
                             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                             typeface = Typeface.MONOSPACE
 
+                            setText(masterPassword)
+
                             onTextChanged {
                                 masterPassword = it.toString()
+
+                                if (it.isNotBlank()) {
+                                    val fingerprint = generateFingerprintHash(masterPassword)
+                                    val fingerprintSpan = getFingerprintSpan(fingerprint)
+
+                                    fingerprintView!!.setText(fingerprintSpan, TextView.BufferType.SPANNABLE)
+                                } else {
+                                    fingerprintView!!.text = ""
+                                }
+
                                 triggerUpdate()
                             }
                         }
+                    }
+
+                    fingerprintView = textView {
+                        typeface = resources.getFont(R.font.fontawesome)
+                        textSize = 30f
+                        letterSpacing = .6f
+
+                        if (masterPassword.isNotBlank()) {
+                            val fingerprint = generateFingerprintHash(masterPassword)
+                            val fingerprintSpan = getFingerprintSpan(fingerprint)
+
+                            fingerprintView!!.setText(fingerprintSpan, TextView.BufferType.SPANNABLE)
+                        }
+                    }.lparams(width = wrapContent, height = wrapContent) {
+                        topMargin = dip(10f)
+                        gravity = Gravity.CENTER
                     }
                 }
             }.lparams(width = matchParent)
@@ -183,9 +234,7 @@ class MainActivity : AppCompatActivity() {
 
             fab = floatingActionButton {
                 imageResource = R.drawable.ic_content_copy
-                visibility = View.GONE
-
-                ((layoutParams as? CoordinatorLayout.LayoutParams)?.behavior as? FloatingActionButton.Behavior)?.isAutoHideEnabled = false
+                visibility = if (generatedPass.isBlank()) View.GONE else View.VISIBLE
 
                 setOnClickListener {
                     clipboardManager.primaryClip.addItem(ClipData.Item(generatedPasswordView!!.text))
@@ -212,6 +261,7 @@ class MainActivity : AppCompatActivity() {
             bottomSheetBehavior = BottomSheetBehavior<View>(context, null).apply {
                 isHideable = true
                 peekHeight = bottomSheetPeekHeight
+
                 setBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
                     override fun onSlide(bottomSheet: View, slideOffset: Float) {}
 
@@ -270,7 +320,7 @@ class MainActivity : AppCompatActivity() {
                     tooltipText = getText(R.string.length)
 
                     min = 4
-                    max = 128
+                    max = 64
 
                     onSeekBarChange {
                         settings.length = progress
@@ -391,7 +441,7 @@ class MainActivity : AppCompatActivity() {
                         text = "SHA256"
                         id = R.id.main_sha256_button
 
-                        onCheckedChange { b, isChecked -> if (isChecked) {
+                        onCheckedChange { _, isChecked -> if (isChecked) {
                             settings.algo = Algorithm.SHA256
                             updatePreview()
                         }}
@@ -420,6 +470,24 @@ class MainActivity : AppCompatActivity() {
                         Algorithm.SHA384 -> R.id.main_sha384_button
                         Algorithm.SHA512 -> R.id.main_sha512_button
                     })
+                }
+
+                textView(R.string.dark_mode) {
+                    textAppearance = settingNameAppearance
+                }.lparams {
+                    topMargin = settingNameTopMargin
+                }
+
+                switch {
+                    isChecked = darkMode
+                    hintResource = if (isChecked) R.string.dark_mode_on else R.string.dark_mode_off
+
+                    onCheckedChange { _, isChecked ->
+                        darkMode = isChecked
+                        hintResource = if (isChecked) R.string.dark_mode_on else R.string.dark_mode_off
+
+                        setTheme(if (isChecked) R.style.AppTheme_Dark else R.style.AppTheme)
+                    }
                 }
 
                 // Autofill
@@ -464,6 +532,19 @@ class MainActivity : AppCompatActivity() {
         } else {
             super.onBackPressed()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle?) {
+        super.onSaveInstanceState(outState)
+
+        @Suppress("NAME_SHADOWING")
+        val outState = outState!!
+
+        outState.putString("website",  website)
+        outState.putString("username", username)
+        outState.putString("master",   masterPassword)
+        outState.putString("generatedPassword", generatedPass)
+        outState.putBoolean("darkMode", darkMode)
     }
 
     override fun onPause() {

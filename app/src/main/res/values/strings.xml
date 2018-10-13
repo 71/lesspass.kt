@@ -17,6 +17,10 @@
     <string name="symbols">Symbols</string>
     <string name="algorithm">Algorithm</string>
 
+    <string name="dark_mode">Dark mode</string>
+    <string name="dark_mode_on">Dark mode is enabled</string>
+    <string name="dark_mode_off">Dark mode is disabled</string>
+
     <string name="autofill">Autofill</string>
     <string name="autofill_on">Autofill is enabled</string>
     <string name="autofill_off">Autofill is disabled</string>
