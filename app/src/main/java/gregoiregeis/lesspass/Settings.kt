@@ -1,10 +1,8 @@
 package gregoiregeis.lesspass
 
 import android.content.Context
-import android.database.CharArrayBuffer
-import java.io.CharArrayWriter
 
-inline fun Int.hasFlag(flag: Int) = (this and flag) == flag
+fun Int.hasFlag(flag: Int) = (this and flag) == flag
 
 enum class Algorithm(val bits: Int) {
     SHA256(256),

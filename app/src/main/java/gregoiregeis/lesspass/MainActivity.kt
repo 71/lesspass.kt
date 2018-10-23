@@ -2,6 +2,7 @@ package gregoiregeis.lesspass
 
 import android.annotation.SuppressLint
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -11,6 +12,7 @@ import android.support.design.widget.BottomSheetBehavior
 import android.support.design.widget.FloatingActionButton
 import android.support.v7.app.AppCompatActivity
 import android.text.Editable
+import android.text.InputFilter
 import android.text.InputType
 import android.text.TextWatcher
 import android.view.Gravity
@@ -69,6 +71,7 @@ class MainActivity : AppCompatActivity() {
     var generatedPass  = ""
 
     var darkMode = false
+    var showPass = true
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,6 +79,10 @@ class MainActivity : AppCompatActivity() {
 
         settings = Settings.load(this)
 
+        defaultSharedPreferences.apply {
+            darkMode = getBoolean("darkMode", false)
+            showPass = getBoolean("showPassword", true)
+        }
 
         coordinatorLayout {
 
@@ -97,7 +104,10 @@ class MainActivity : AppCompatActivity() {
                         generatedPass = settings.generatePassword(masterPassword, website, username)
 
                         GlobalScope.launch(Dispatchers.Main) {
-                            generatedPasswordView!!.text = generatedPass
+                            if (showPass)
+                                generatedPasswordView!!.text = generatedPass
+                            else
+                                generatedPasswordView!!.text = "*".repeat(generatedPass.length)
 
                             if (bottomSheetBehavior.state == BottomSheetBehavior.STATE_COLLAPSED)
                                 fab!!.show()
@@ -115,7 +125,9 @@ class MainActivity : AppCompatActivity() {
                 masterPassword = getString("master", "")
                 generatedPass  = getString("generatedPassword", "")
 
-                darkMode = getBoolean("darkMode", false)
+                if (darkMode) {
+                    setTheme(R.style.AppTheme_Dark)
+                }
 
                 triggerUpdate()
             }
@@ -132,8 +144,12 @@ class MainActivity : AppCompatActivity() {
                         textColor = Color.WHITE
 
                         if (generatedPass.isNotBlank()) {
-                            text = generatedPass
                             textSize = getTextSize(generatedPass.length)
+
+                            if (showPass)
+                                text = generatedPass
+                            else
+                                text = "*".repeat(generatedPass.length)
                         }
 
                         gravity = Gravity.CENTER_HORIZONTAL
@@ -237,7 +253,7 @@ class MainActivity : AppCompatActivity() {
                 visibility = if (generatedPass.isBlank()) View.GONE else View.VISIBLE
 
                 setOnClickListener {
-                    clipboardManager.primaryClip.addItem(ClipData.Item(generatedPasswordView!!.text))
+                    clipboardManager.primaryClip = ClipData.newPlainText("password", generatedPass)
 
                     GlobalScope.launch(Dispatchers.Main) {
                         imageResource = R.drawable.ic_check
@@ -268,7 +284,7 @@ class MainActivity : AppCompatActivity() {
                     override fun onStateChanged(bottomSheet: View, newState: Int) {
                         if (newState != BottomSheetBehavior.STATE_COLLAPSED) {
                             fab.hide()
-                        } else if (generatedPasswordView!!.text.isNotEmpty()) {
+                        } else if (generatedPass.isNotEmpty()) {
                             fab.show()
                         }
                     }
@@ -356,6 +372,8 @@ class MainActivity : AppCompatActivity() {
                 editText {
                     hintResource = R.string.iterations
                     inputType = InputType.TYPE_CLASS_NUMBER
+
+                    filters += InputFilter.LengthFilter(8)
 
                     setText(settings.iterations.toString())
 
@@ -472,6 +490,30 @@ class MainActivity : AppCompatActivity() {
                     })
                 }
 
+                textView(R.string.show_password) {
+                    textAppearance = settingNameAppearance
+                }.lparams {
+                    topMargin = settingNameTopMargin
+                }
+
+                switch {
+                    isChecked = showPass
+                    hintResource = if (isChecked) R.string.show_password_on else R.string.show_password_off
+
+                    onCheckedChange { _, isChecked ->
+                        showPass = isChecked
+                        hintResource = if (isChecked) R.string.show_password_on else R.string.show_password_off
+
+                        if (generatedPass.isNotBlank()) {
+                            if (isChecked) {
+                                generatedPasswordView!!.text = generatedPass
+                            } else {
+                                generatedPasswordView!!.text = "*".repeat(generatedPass.length)
+                            }
+                        }
+                    }
+                }
+
                 textView(R.string.dark_mode) {
                     textAppearance = settingNameAppearance
                 }.lparams {
@@ -544,11 +586,17 @@ class MainActivity : AppCompatActivity() {
         outState.putString("username", username)
         outState.putString("master",   masterPassword)
         outState.putString("generatedPassword", generatedPass)
-        outState.putBoolean("darkMode", darkMode)
     }
 
     override fun onPause() {
         settings.save(this)
+
+        defaultSharedPreferences.edit().apply {
+            putBoolean("darkMode", darkMode)
+            putBoolean("showPassword", showPass)
+
+            apply()
+        }
 
         super.onPause()
     }

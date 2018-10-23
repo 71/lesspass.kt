@@ -17,6 +17,10 @@
     <string name="symbols">Symbols</string>
     <string name="algorithm">Algorithm</string>
 
+    <string name="show_password">Show password</string>
+    <string name="show_password_on">Password will be shown in plain text</string>
+    <string name="show_password_off">Password characters will be hidden</string>
+
     <string name="dark_mode">Dark mode</string>
     <string name="dark_mode_on">Dark mode is enabled</string>
     <string name="dark_mode_off">Dark mode is disabled</string>
